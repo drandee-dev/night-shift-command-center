@@ -35,7 +35,8 @@ class Probe(unittest.TestCase):
             db.close()
             (home / "scheduler_state.json").write_text(json.dumps({"ephraim-career": "2026-11-03T13:00:00+00:00"}))
             before = (home / "spend.db").stat().st_mtime_ns
-            env = {**os.environ, "FLEET_HOME": str(home), "PATH": ""}  # empty PATH: docker cannot be found
+            # a docker command that cannot exist; an empty PATH is not enough on Windows, which still searches its own folders
+            env = {**os.environ, "FLEET_HOME": str(home), "FLEET_DOCKER": "docker-missing-for-test"}
             out = json.loads(subprocess.run([sys.executable, str(PROBE)], capture_output=True, text=True, env=env).stdout)
             self.assertEqual(out["spend"]["month"], "2026-11")
             self.assertEqual((out["spend"]["total_usd"], out["spend"]["by_agent"]), (1.75, {"cassius": 0.5, "ephraim": 1.25}))
@@ -45,7 +46,7 @@ class Probe(unittest.TestCase):
 
     def test_missing_files_are_reported_not_fatal(self):
         with tempfile.TemporaryDirectory() as tmp:
-            env = {**os.environ, "FLEET_HOME": tmp, "PATH": ""}
+            env = {**os.environ, "FLEET_HOME": tmp, "FLEET_DOCKER": "docker-missing-for-test"}
             out = json.loads(subprocess.run([sys.executable, str(PROBE)], capture_output=True, text=True, env=env).stdout)
             self.assertIsNone(out["spend"])
             self.assertIn("spend_error", out)

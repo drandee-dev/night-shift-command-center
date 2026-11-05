@@ -3,7 +3,7 @@
 Read-only and stdlib only. It opens the fleet's spend store with mode=ro, reads the scheduler's state file and asks
 docker for the fleet-* containers (stopped ones too, so a dead one shows as Exited), then prints one JSON object.
 It writes nothing on the box and sends nothing anywhere.
-FLEET_HOME overrides ~/.fleet (the tests use that).
+FLEET_HOME overrides ~/.fleet and FLEET_DOCKER overrides the docker command (the tests use both).
 """
 
 import datetime as dt
@@ -32,7 +32,8 @@ except Exception as exc:  # noqa: BLE001
     out["jobs_error"] = str(exc)[:200]
 
 try:
-    ps = subprocess.run(["docker", "ps", "-a", "--filter", "name=fleet-", "--format", "{{.Names}}\t{{.Status}}"],
+    docker = os.environ.get("FLEET_DOCKER") or "docker"
+    ps = subprocess.run([docker, "ps", "-a", "--filter", "name=fleet-", "--format", "{{.Names}}\t{{.Status}}"],
                         capture_output=True, text=True, timeout=15)
     out["containers"] = dict(line.split("\t", 1) for line in ps.stdout.splitlines() if "\t" in line)
 except Exception as exc:  # noqa: BLE001
