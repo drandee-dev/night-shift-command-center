@@ -221,7 +221,7 @@ class RefreshLedger(unittest.TestCase):
         p = write(self.root, "p.md", "---\nsource: https://github.com/o/p\nlocation: user plugin (p@mkt marketplace)\ninstalled_ref: 1.0.0\nupstream_ref: aaaaaaa\nchecked: 2026-01-01\n---\n")
         seen = []
         plugin = lambda key: seen.append(key) or "9999999"  # noqa: E731
-        r = refresh_ledger.refresh_note(p, "2026-09-14", remote=lambda repo: "1111111", local=lambda n, root="skills-src": None, plugin=plugin)
+        refresh_ledger.refresh_note(p, "2026-09-14", remote=lambda repo: "1111111", local=lambda n, root="skills-src": None, plugin=plugin)
         self.assertEqual(seen, ["p@mkt"])
         self.assertIn("installed_ref: 9999999\n", p.read_text(encoding="utf-8"))
 

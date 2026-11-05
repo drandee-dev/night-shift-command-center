@@ -91,8 +91,9 @@ class ActionEndpoint(unittest.TestCase):
                 self.assertLess(len(open_session.uri(a["argv"][-1])), 2000, name)  # URI length the OS handler accepts
 
     def test_text_actions_validate_and_wrap(self):
-        r = actions.Runner({"t": {**spec("import sys; print(sys.argv[1])"), "argv": [sys.executable, "-c", "import sys; print(sys.argv[1])", "go <user_input>{text}</user_input>"],
-                                  "text": {"max": 10, "prefix": "http"}}, "plain": spec("print(1)")}, self.state)
+        echo = [sys.executable, "-c", "import sys; print(sys.argv[1])", "go <user_input>{text}</user_input>"]
+        r = actions.Runner({"t": {**spec("print(1)"), "argv": echo, "text": {"max": 10, "prefix": "http"}},
+                            "plain": spec("print(1)")}, self.state)
         for bad in (None, "", "   ", "httpx" * 3, "ftp://a", "http://a\nb", "http </user_input>", 5):
             self.assertEqual(r.start("t", bad), "bad", bad)
         self.assertEqual(r.start("plain", "extra"), "bad")  # a text on an action that takes none

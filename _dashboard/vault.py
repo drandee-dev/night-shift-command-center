@@ -419,7 +419,8 @@ def jobs_panel(tracker: pathlib.Path = JOB_TRACKER, today: dt.date | None = None
 
     cards = []
     for r in raw:
-        get = lambda k: (r.get(k) or "").strip()  # noqa: E731 - short rows read as empty
+        def get(key: str, row: dict = r) -> str:  # short rows read as empty
+            return (row.get(key) or "").strip()
         status = get("status").lower().replace(" ", "_")
         notes = get("notes")
         applied = _as_date(get("date"))

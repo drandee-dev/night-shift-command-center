@@ -1,0 +1,14 @@
+# pyflakes, pycodestyle, import order and the bugbear checks; local time is intended throughout, so no timezone rules
+line-length = 140
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["E731"]  # a few one-line lambdas in tests are clearer than defs
+
+[lint.per-file-ignores]
+"_dashboard/tests/*" = ["E501"]  # fixture strings (frontmatter, CSV rows, transcript lines) read better unbroken
+
+[lint.isort]
+known-first-party = ["actions", "nightshift", "nightshift_api", "night_shift_server", "vault", "usage", "fleet_pull",
+                     "fleet_probe", "open_session", "refresh_ledger"]

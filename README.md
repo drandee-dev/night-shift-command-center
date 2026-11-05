@@ -1,5 +1,7 @@
 # Night Shift Command Center
 
+[![CI](https://github.com/drandee-dev/night-shift-command-center/actions/workflows/ci.yml/badge.svg)](https://github.com/drandee-dev/night-shift-command-center/actions/workflows/ci.yml)
+
 A clickable 3D street corner that works as the home screen of my notes vault. Each shop, sign and prop in the scene is
 a button. Clicking one opens a panel with live numbers from the vault, and the buttons in that panel start real work:
 a check that runs on my PC, or a new Claude Code session in VS Code with the right prompt already typed in.
@@ -78,6 +80,32 @@ The server has no login, so the design makes sure nothing but my own clicks can 
 - A list view replaces the picture with a plain list of every panel. It turns on by itself if the picture fails to
   load.
 - Motion starts off when the system asks for reduced motion.
+
+## Repository layout
+
+The repo keeps the folder layout of my vault, so the note works when dropped into a vault and each snapshot is a
+straight copy of the live code.
+
+```
+night-shift-dashboard.md        the dashboard: one Dataview JS block (scene, panels, polling, keyboard, list view)
+_attachments/scenes/            the rendered scene, one hover mask per object, the rain loop, the hotspot boxes
+_dashboard/
+  night_shift_server.py         the server on its own (loopback only)
+  nightshift_api.py             the routes and their guard
+  actions.py                    the allowlist of actions and the runner that validates and starts them
+  nightshift.py                 live state: run states, schedules, fleet status, unused skills, log tails
+  open_session.py               opens VS Code on a folder with a prompt ready
+  fleet_pull.py, fleet_probe.py the read-only status pull from the fleet server
+  usage.py, vault.py            readers for Claude Code transcripts and the vault
+  tests/                        unittest suite, run in CI on Windows
+```
+
+Adding a button is one entry in the action table in `actions.py` and one tooltip line in the note. Adding a clickable
+object is one entry in the note's panel list, keyed by the tag the object carries in the scene.
+
+The server is not containerized on purpose. Its job is to act on this PC: open VS Code, read Windows Task Scheduler,
+read the vault and the Claude Code transcripts. A container would cut it off from exactly those. The fleet of Discord
+agents it reports on runs in Docker on a cloud server.
 
 ## Running it
 

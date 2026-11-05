@@ -167,9 +167,8 @@ def refresh_note(path: pathlib.Path, today: str, dry_run: bool = False, remote=l
     if not changed_up and field_value(text, "upstream_ref") != upstream:
         report["error"] = "upstream_ref line missing; not written"
         return report
-    changed_inst = False
     if installed:
-        new_text, changed_inst = set_field(new_text, "installed_ref", installed)
+        new_text, _ = set_field(new_text, "installed_ref", installed)
     new_text, changed_checked = set_field(new_text, "checked", today)
     if not changed_checked and field_value(text, "checked") != today:
         report["error"] = "checked line missing; not written"

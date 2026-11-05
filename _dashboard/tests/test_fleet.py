@@ -31,7 +31,8 @@ class Probe(unittest.TestCase):
             db.executemany("INSERT INTO calls VALUES (?,?,?,?)", [
                 ("2026-10-30T01:00:00", "2026-10", "ephraim", 9.0), ("2026-11-02T01:00:00", "2026-11", "ephraim", 1.25),
                 ("2026-11-03T01:00:00", "2026-11", "cassius", 0.5)])
-            db.commit(); db.close()
+            db.commit()
+            db.close()
             (home / "scheduler_state.json").write_text(json.dumps({"ephraim-career": "2026-11-03T13:00:00+00:00"}))
             before = (home / "spend.db").stat().st_mtime_ns
             env = {**os.environ, "FLEET_HOME": str(home), "PATH": ""}  # empty PATH: docker cannot be found
@@ -70,7 +71,8 @@ class Pull(unittest.TestCase):
             self.assertEqual(second["last_ok"], first["pulled_at"])
 
     def test_command_is_the_fixed_read_only_ssh(self):
-        cmd = fleet_pull.ssh_cmd({"NIGHT_SHIFT_FLEET_HOST": "user@box.example", "NIGHT_SHIFT_FLEET_KEY": "k.key"}, pathlib.Path("missing.json"))
+        env = {"NIGHT_SHIFT_FLEET_HOST": "user@box.example", "NIGHT_SHIFT_FLEET_KEY": "k.key"}
+        cmd = fleet_pull.ssh_cmd(env, pathlib.Path("missing.json"))
         self.assertEqual(cmd[0], "ssh")
         self.assertIn("BatchMode=yes", cmd)
         self.assertEqual(cmd[-4:], ["--", "user@box.example", "python3", "-"])  # options end before the host; probe from stdin

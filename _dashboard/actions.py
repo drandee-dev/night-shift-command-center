@@ -97,10 +97,12 @@ def default_actions() -> dict[str, dict]:
     table["sort-orphans"] = session(VAULT, ORPHANS, "orphans")
     # library: each takes one typed string. Skills are invoked by name in words, not "/x text" (text after a command is read as arguments).
     table["lib-research"] = text_session("Use the research skill on the topic in the tags below and write the resource note.", "library")
-    table["lib-sweep"] = text_session("Use the ephraim agent for a research sweep on the topic in the tags below, vault first, then the web.", "library")
+    table["lib-sweep"] = text_session("Use the ephraim agent for a research sweep on the topic in the tags below, "
+                                      "vault first, then the web.", "library")
     table["lib-clip"] = text_session("Use the clip skill on the URL in the tags below.", "library", prefix="http")
     table["lib-capture"] = text_session("Use the capture skill to save the text in the tags below, verbatim.", "library")
-    table["lib-ask"] = text_session("Search the vault for what I already know about the topic in the tags below, answer from the notes with links, and write nothing.", "library")
+    table["lib-ask"] = text_session("Search the vault for what I already know about the topic in the tags below, "
+                                    "answer from the notes with links, and write nothing.", "library")
     # Dusty shelf: "try it" on a skill that is loadable here, named exactly
     skills = frozenset(r["name"] for r in vault.loadable_skills())
     table["skill-try"] = text_session("Explain in a few lines what the skill named in the tags below is for and when it helps, then "

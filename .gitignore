@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.ruff_cache/
 .env
 # paid asset packs and personal data never go in this repo (the export script also refuses them)
 *.fbx
