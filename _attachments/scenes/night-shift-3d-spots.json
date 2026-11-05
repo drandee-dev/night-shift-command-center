@@ -1,0 +1,132 @@
+{
+ "daily": {
+  "box": [
+   31.88,
+   68.43,
+   20.26,
+   20.83
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-daily.png",
+  "pixels": 28722
+ },
+ "email": {
+  "box": [
+   1.98,
+   66.11,
+   2.86,
+   8.98
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-email.png",
+  "pixels": 3934
+ },
+ "fleet": {
+  "box": [
+   63.28,
+   0.65,
+   8.91,
+   21.3
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-fleet.png",
+  "pixels": 27335
+ },
+ "games": {
+  "box": [
+   51.67,
+   52.22,
+   15.42,
+   34.35
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-games.png",
+  "pixels": 50121
+ },
+ "inbox": {
+  "box": [
+   1.25,
+   55.09,
+   5.99,
+   16.48
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-inbox.png",
+  "pixels": 11825
+ },
+ "jobs": {
+  "box": [
+   31.88,
+   33.61,
+   20.26,
+   42.22
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-jobs.png",
+  "pixels": 112361
+ },
+ "library": {
+  "box": [
+   80.73,
+   4.63,
+   19.22,
+   66.11
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-library.png",
+  "pixels": 185233
+ },
+ "mart": {
+  "box": [
+   7.76,
+   56.02,
+   14.38,
+   22.22
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-mart.png",
+  "pixels": 28052
+ },
+ "news": {
+  "box": [
+   34.69,
+   0.0,
+   9.38,
+   38.61
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-news.png",
+  "pixels": 58178
+ },
+ "orphans": {
+  "box": [
+   87.19,
+   61.02,
+   3.96,
+   9.81
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-orphans.png",
+  "pixels": 5138
+ },
+ "pins": {
+  "box": [
+   46.88,
+   71.39,
+   5.0,
+   17.13
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-pins.png",
+  "pixels": 14154
+ },
+ "projects": {
+  "box": [
+   66.56,
+   46.85,
+   22.66,
+   33.24
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-projects.png",
+  "pixels": 62964
+ },
+ "tooling": {
+  "box": [
+   21.67,
+   59.35,
+   10.78,
+   23.15
+  ],
+  "mask": "_attachments/scenes/night-shift-3d-mask-tooling.png",
+  "pixels": 28114
+ }
+}

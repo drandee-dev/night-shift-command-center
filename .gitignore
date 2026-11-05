@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+# paid asset packs and personal data never go in this repo (the export script also refuses them)
+*.fbx
+*.vox
+*.blend
+*.glb
+*.csv
