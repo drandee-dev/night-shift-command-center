@@ -1,6 +1,9 @@
 # pyflakes, pycodestyle, import order and the bugbear checks; local time is intended throughout, so no timezone rules
 line-length = 140
 target-version = "py312"
+# the Blender scene scripts run inside Blender's own Python (bpy), several share globals (night_shift_looks.py runs
+# night_shift_motion.py in its namespace), and they are written densely, one placed object per line; CI lints the server
+extend-exclude = ["scripts"]
 
 [lint]
 select = ["E", "F", "W", "I", "B"]

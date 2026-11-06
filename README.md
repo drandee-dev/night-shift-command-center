@@ -9,7 +9,7 @@ a check that runs on my PC, or a new Claude Code session in VS Code with the rig
 ![The Night Shift street corner at night, rendered in Blender](_attachments/scenes/night-shift-3d.png)
 
 **Status: work in progress.** I am still building this across several sessions, so the repo is a snapshot that I
-refresh as the project moves. The Blender scripts that build the scene will be added in a later snapshot.
+refresh as the project moves.
 
 ## What it does
 
@@ -106,6 +106,7 @@ _dashboard/
   fleet_pull.py, fleet_probe.py the read-only status pull from the fleet server
   usage.py, vault.py            readers for Claude Code transcripts and the vault
   tests/                        unittest suite, run in CI on Windows
+scripts/                        the Blender scripts that build and render the scene
 ```
 
 Adding a button is one entry in the action table in `actions.py` and one tooltip line in the note. Adding a clickable
@@ -131,6 +132,16 @@ Google Fonts.
 Some parts are Windows-only: session buttons open VS Code through `code.cmd` and the Windows URL handler, and the
 24H Mart reads Windows Task Scheduler. Comments in the code sometimes point to planning notes in my private vault;
 those notes are not part of this repo.
+
+### Rebuilding the scene
+
+The scripts in `scripts/` build the scene in Blender 5.2 from Max Parata's packs, which you have to buy yourself and
+which this repo does not include. Point `NIGHT_SHIFT_PACKS` at the folder that holds them. The run order is kit, ramen,
+shops, people, corner, looks, spots and rain, and the first lines of each script give its exact Blender command.
+`night_shift_looks.py` renders the lit still, and with `-- b anim` it renders the motion loop through
+`night_shift_motion.py`. `night_shift_spots.py` writes the hover masks and hotspot boxes the dashboard reads. The
+scripts save their .blend files to `projects/night-shift-3d/` (the kit script creates it) and preview renders to
+`_attachments/previews/`, so create that folder first. They use Windows paths and are not linted in CI.
 
 ## How this was built
 
