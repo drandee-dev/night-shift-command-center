@@ -95,7 +95,10 @@ class ActionEndpoint(unittest.TestCase):
         self.assertEqual(path.read_text(encoding="ascii"), second)
         if sys.platform == "win32":
             acl = subprocess.run(["icacls", str(path)], capture_output=True, text=True, check=True).stdout
-            aces = [line for line in acl.splitlines() if ":(" in line]
+            # SYSTEM and admins can read any file anyway; GitHub's elevated runner keeps explicit grants for them
+            # (the lock Python puts on its temp folders), so only they may appear beside this account
+            privileged = ("nt authority\\system", "builtin\\administrators", "owner rights")
+            aces = [line for line in acl.splitlines() if ":(" in line and not any(p in line.lower() for p in privileged)]
             self.assertEqual(len(aces), 1, acl)  # only this account, nothing inherited
             self.assertIn(os.environ["USERNAME"].lower(), aces[0].lower())
             self.assertNotIn("(I)", acl)
