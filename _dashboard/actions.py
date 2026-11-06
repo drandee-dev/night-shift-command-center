@@ -88,7 +88,8 @@ def default_actions() -> dict[str, dict]:
         "commands from there."), "jobs")
     for task, log, script in (("SecondBrain-LedgerRefresh", "ledger-refresh", "run_refresh_ledger.cmd"),
                               ("SecondBrain-WeeklyReview", "weekly-review", "run_weekly_review.cmd"),
-                              ("SecondBrain-Dashboard", "dashboard", "run_dashboard.cmd")):
+                              ("SecondBrain-Dashboard", "dashboard", "run_dashboard.cmd"),
+                              ("SecondBrain-FleetPull", "fleet-pull", "run_fleet_pull.cmd")):
         table[f"ask-{log}"] = session(VAULT, (
             f"The Windows Scheduled Task {task} may have failed. Read the last 60 lines of "
             f"{HOME / 'logs' / (log + '.log')} and _dashboard/{script}, run Get-ScheduledTaskInfo for it, "

@@ -1,6 +1,7 @@
 """Pull the fleet's status from the Oracle box into ~/.second-brain/state/fleet.json.
 
-    python _dashboard/fleet_pull.py            # one pull; run by the dish drawer's button, never on a timer (pins.md)
+    python _dashboard/fleet_pull.py            # one pull: the dish drawer's button, and the SecondBrain-FleetPull
+                                               # task every 10 minutes while he is logged on (run_fleet_pull.cmd)
 
 One fixed read-only ssh command: it feeds fleet_probe.py to `python3 -` on the box. Nothing on the box changes and
 no argument comes from a caller. BatchMode means a missing key or a changed host key fails instead of prompting.
@@ -59,7 +60,7 @@ def pull(out: pathlib.Path = OUT, cmd: list[str] | None = None) -> bool:
         result = {"ok": False, "pulled_at": now, "error": str(exc)[:300], "data": old.get("data"),
                   "last_ok": old.get("pulled_at") if old.get("ok") else old.get("last_ok")}
     out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_suffix(".tmp")
+    tmp = out.with_suffix(f".{os.getpid()}.tmp")  # the button and the 10-minute task can pull at the same moment
     tmp.write_text(json.dumps(result), encoding="utf-8")
     tmp.replace(out)
     return result["ok"]

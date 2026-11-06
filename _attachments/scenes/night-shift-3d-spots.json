@@ -7,17 +7,17 @@
    20.83
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-daily.png",
-  "pixels": 28722
+  "pixels": 27866
  },
  "email": {
   "box": [
    1.98,
-   66.11,
+   68.7,
    2.86,
    8.98
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-email.png",
-  "pixels": 3934
+  "pixels": 3940
  },
  "fleet": {
   "box": [
@@ -37,7 +37,7 @@
    34.35
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-games.png",
-  "pixels": 50121
+  "pixels": 45986
  },
  "inbox": {
   "box": [
@@ -47,7 +47,7 @@
    16.48
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-inbox.png",
-  "pixels": 11825
+  "pixels": 14108
  },
  "jobs": {
   "box": [
@@ -57,17 +57,17 @@
    42.22
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-jobs.png",
-  "pixels": 112361
+  "pixels": 110165
  },
  "library": {
   "box": [
-   80.73,
-   4.63,
-   19.22,
-   66.11
+   80.42,
+   5.19,
+   18.8,
+   66.48
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-library.png",
-  "pixels": 185233
+  "pixels": 170356
  },
  "mart": {
   "box": [
@@ -77,7 +77,7 @@
    22.22
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-mart.png",
-  "pixels": 28052
+  "pixels": 31693
  },
  "news": {
   "box": [
@@ -91,13 +91,13 @@
  },
  "orphans": {
   "box": [
-   87.19,
-   61.02,
-   3.96,
-   9.81
+   81.67,
+   76.48,
+   2.4,
+   3.61
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-orphans.png",
-  "pixels": 5138
+  "pixels": 934
  },
  "pins": {
   "box": [
@@ -107,7 +107,7 @@
    17.13
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-pins.png",
-  "pixels": 14154
+  "pixels": 14097
  },
  "projects": {
   "box": [
@@ -117,7 +117,7 @@
    33.24
   ],
   "mask": "_attachments/scenes/night-shift-3d-mask-projects.png",
-  "pixels": 62964
+  "pixels": 64005
  },
  "tooling": {
   "box": [

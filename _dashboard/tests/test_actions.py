@@ -5,7 +5,9 @@ Run from the vault root:  python -m unittest discover -s _dashboard/tests
 
 from __future__ import annotations
 
+import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import time
@@ -14,13 +16,18 @@ from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
+from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import actions  # noqa: E402
 import night_shift_server  # noqa: E402
+import nightshift_api  # noqa: E402
 import open_session  # noqa: E402
 
-OK = {"host": "127.0.0.1:8790", "x-night-shift": "1"}
+TOKEN = "test-token"  # tests always pass their own: a default create_app() would overwrite the live token file
+OK = {"host": "127.0.0.1:8790", "x-night-shift": TOKEN}
+ROUTES = ("/actions/hello", "/api/night-shift", "/api/night-shift/schedules", "/api/night-shift/fleet",
+          "/api/night-shift/dusty", "/api/night-shift/log/ledger-refresh", "/api/night-shift/usage")
 
 
 def spec(code: str, timeout: int = 10) -> dict:
@@ -35,14 +42,14 @@ class ActionEndpoint(unittest.TestCase):
             {"hello": spec("print('hi')"), "boom": spec("raise SystemExit(3)"),
              "slow": spec("import time; time.sleep(30)", timeout=1), "hold": spec("import time; time.sleep(2)")},
             self.state)
-        self.client = TestClient(night_shift_server.create_app(self.runner))
+        self.client = TestClient(night_shift_server.create_app(self.runner, token=TOKEN))
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def wait(self, action_id: str) -> dict:
         for _ in range(100):
-            s = self.client.get(f"/actions/{action_id}", headers={"host": "127.0.0.1:8790"}).json()
+            s = self.client.get(f"/actions/{action_id}", headers=OK).json()
             if s["status"] != "running":
                 return s
             time.sleep(0.1)
@@ -61,18 +68,39 @@ class ActionEndpoint(unittest.TestCase):
         self.client.post("/actions/slow", headers=OK)
         self.assertEqual(self.wait("slow")["status"], "timeout")
 
-    def test_guard_rejects_missing_header_and_bad_host(self):
-        no_header = self.client.post("/actions/hello", headers={"host": "127.0.0.1:8790"})
-        bad_host = self.client.post("/actions/hello", headers={"host": "evil.example", "x-night-shift": "1"})
-        self.assertEqual((no_header.status_code, bad_host.status_code), (403, 403))
+    def test_guard_rejects_missing_or_wrong_token_and_bad_host(self):
+        local = {"host": "127.0.0.1:8790"}
+        for headers in (local, {**local, "x-night-shift": "1"}, {**local, "x-night-shift": TOKEN + "x"},
+                        {**local, "x-night-shift": ""}, {**OK, "host": "evil.example"}):
+            self.assertEqual(self.client.post("/actions/hello", headers=headers).status_code, 403, headers)
         self.assertEqual(self.runner.state("hello")["status"], "never")  # nothing ran
 
-    def test_every_get_route_rejects_a_foreign_host(self):
-        # the GET routes return data, so they carry the DNS-rebinding protection
-        for path in ("/actions/hello", "/api/night-shift", "/api/night-shift/schedules", "/api/night-shift/fleet",
-                     "/api/night-shift/dusty", "/api/night-shift/log/ledger-refresh", "/api/night-shift/usage"):
+    def test_every_get_route_needs_the_token_and_a_local_host(self):
+        # the GET routes return data (pins, logs, usage), so they carry the same guard as POST
+        for path in ROUTES:
+            self.assertEqual(self.client.get(path, headers={"host": "127.0.0.1:8790"}).status_code, 403, path)
+            self.assertNotEqual(self.client.get(path, headers=OK).status_code, 403, path)
             for host in ("evil.example", "127.0.0.1.evil.com:8790", "[::1]:8790"):
-                self.assertEqual(self.client.get(path, headers={"host": host}).status_code, 403, (path, host))
+                self.assertEqual(self.client.get(path, headers={**OK, "host": host}).status_code, 403, (path, host))
+
+    def test_register_refuses_an_empty_token(self):
+        with self.assertRaises(ValueError):
+            nightshift_api.register(FastAPI(), self.runner, "")
+
+    def test_new_token_file_is_fresh_and_locked_to_this_account(self):
+        path = self.state / "sub" / "night-shift-token"
+        first, second = nightshift_api.new_token(path), nightshift_api.new_token(path)
+        self.assertNotEqual(first, second)
+        self.assertGreaterEqual(len(second), 40)
+        self.assertEqual(path.read_text(encoding="ascii"), second)
+        if sys.platform == "win32":
+            acl = subprocess.run(["icacls", str(path)], capture_output=True, text=True, check=True).stdout
+            aces = [line for line in acl.splitlines() if ":(" in line]
+            self.assertEqual(len(aces), 1, acl)  # only this account, nothing inherited
+            self.assertIn(os.environ["USERNAME"].lower(), aces[0].lower())
+            self.assertNotIn("(I)", acl)
+        else:
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_unknown_id_and_one_run_at_a_time(self):
         self.assertEqual(self.client.post("/actions/rm-rf", headers=OK).status_code, 404)
@@ -143,7 +171,7 @@ class ActionEndpoint(unittest.TestCase):
     def test_night_shift_server_alone_has_the_same_guarded_routes(self):
         c = self.client
         self.assertEqual(c.post("/actions/hello", headers=OK).status_code, 202)
-        self.assertEqual(c.post("/actions/hello", headers={"host": "evil.example", "x-night-shift": "1"}).status_code, 403)
+        self.assertEqual(c.post("/actions/hello", headers={**OK, "host": "evil.example"}).status_code, 403)
         self.assertEqual(c.get("/tooling").status_code, 404)  # the private vault pages are not part of it
         self.assertEqual(c.get("/openapi.json").status_code, 404)
         self.assertEqual(night_shift_server.main(["--host", "0.0.0.0"]), 2)  # refuses a non-loopback bind

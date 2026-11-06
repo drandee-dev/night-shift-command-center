@@ -171,12 +171,19 @@ def inbox_panel(vault: pathlib.Path = VAULT, today: dt.date | None = None) -> li
     inbox = vault / "_inbox"
     if not inbox.exists():
         return rows
-    for path in sorted(inbox.glob("*.md")):
+    # a capture is a note in _inbox/ or a bundle _inbox/<slug>/ (note, shots/, data/; /triage moves it whole):
+    # one item per bundle, its first note standing for it (same rule as the Night Shift inbox drawer)
+    items = [(p.stem, p) for p in sorted(inbox.glob("*.md"))]
+    for folder in sorted(d for d in inbox.iterdir() if d.is_dir()):
+        notes = sorted(folder.glob("*.md")) or sorted(folder.rglob("*.md"))  # the bundle's own note before data/
+        if notes:
+            items.append((folder.name, notes[0]))
+    for name, path in items:
         fm = read_frontmatter(path)
         created = dt.datetime.fromtimestamp(path.stat().st_ctime).date()
         waiting = (today - created).days
         rows.append({
-            "name": path.stem,
+            "name": name,
             "waiting": waiting,
             "heat": "stale" if waiting > 14 else "aging" if waiting > 3 else "fresh",
             "tags": [str(t) for t in (fm.get("tags") or [])],

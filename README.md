@@ -19,9 +19,12 @@ lights up on its own outline rather than as a box. The panels map to parts of my
 - the florist holds my projects, with a Resume button per repo
 - the repair shop shows tools in my tooling ledger that are out of date
 - the ramen stand is today's log and the weekly review
-- the net café counts job search follow-ups (counts only, never company names)
+- the net café counts job search follow-ups, and once a day a small note in the corner names the ones that have just
+  come due (the names come from my private tracker, never from this repo)
 - the 24H Mart shows this PC's scheduled tasks, with their logs one click away
-- the satellite dish shows the status of a small fleet of Discord agents I run on a cloud server
+- the satellite dish shows the status of a small fleet of Discord agents I run on a cloud server, pulled every 10
+  minutes while I am logged on
+- a trash bag on a rooftop counts notes that nothing links to, and more bags pile up on the roof as that count grows
 - the library takes a typed topic and starts a research session, and its "dusty shelf" lists skills I have not used
   in 30 days
 - a flyer wall holds things I asked a session to pin, each with resume, stress-test and scope actions
@@ -56,8 +59,12 @@ The server has no login, so the design makes sure nothing but my own clicks can 
 
 - It binds to 127.0.0.1 only and refuses any other address.
 - Every route checks the Host header, which blocks DNS rebinding.
-- Starting an action needs a custom header. A web page in a browser would have to send a CORS preflight for that, and
-  the server never answers one, so no website I visit can start an action.
+- Every route needs a token. The server makes a new random one at each start and writes it to a file in my profile that
+  only my Windows account can read (inherited access is removed), and the dashboard note reads that file for each
+  request. Other accounts and sandboxed programs on the PC cannot read it, so they cannot call the server. A program
+  running as my own account still could, which is the usual limit of a local token.
+- The token travels in a custom header. A web page in a browser would have to send a CORS preflight for that, and the
+  server never answers one, so no website I visit can call it.
 - A click sends only an action id from a fixed list. Each action is a fixed command run without a shell.
 - The one place I can type text, the library box, accepts at most 150 printable characters, caps the encoded length,
   and wraps the text in `<user_input>` tags with an instruction to treat it as data. A few actions accept only an exact
@@ -88,7 +95,8 @@ straight copy of the live code.
 
 ```
 night-shift-dashboard.md        the dashboard: one Dataview JS block (scene, panels, polling, keyboard, list view)
-_attachments/scenes/            the rendered scene, one hover mask per object, the rain loop, the hotspot boxes
+_attachments/scenes/            the rendered scene, one hover mask per object, the rain loop, the hotspot boxes and
+                                the three trash-pile layers
 _dashboard/
   night_shift_server.py         the server on its own (loopback only)
   nightshift_api.py             the routes and their guard

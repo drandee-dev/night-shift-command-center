@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import pathlib
+import re
 import sys
 import tempfile
 import unittest
@@ -99,6 +100,30 @@ class Schedules(unittest.TestCase):
         with self.fake_run([bad, running]):
             got = {s["name"]: s["ok"] for s in nightshift.schedules()}
         self.assertEqual(got, {"SecondBrain-WeeklyReview": False, "SecondBrain-Dashboard": True})
+        stopped = dict(row, name="SecondBrain-WeeklyReview", result=267014)  # ended by the user, not a failure
+        restarted = dict(row, name="SecondBrain-Dashboard", state="Running", result=1)  # killed, then started again
+        with self.fake_run([stopped, restarted]):
+            self.assertTrue(all(s["ok"] for s in nightshift.schedules()))
+
+    def test_every_logged_schedule_has_ask_claude_and_its_script(self):
+        # SCHEDULE_LOGS (nightshift.py) and the ask-* table (actions.py) are kept by hand; the mart drawer needs both
+        table = actions.default_actions()
+        here = pathlib.Path(nightshift.__file__).parent
+        launchers = any(here.glob("run_*.cmd"))  # not in the public snapshot: they hold this PC's paths
+        for task, log in nightshift.SCHEDULE_LOGS.items():
+            if log is None:
+                continue
+            self.assertIn(f"ask-{log}", table, task)
+            script = re.search(r"_dashboard/(run_\w+\.cmd)", table[f"ask-{log}"]["argv"][-1])
+            self.assertIsNotNone(script, task)
+            if launchers:
+                self.assertTrue((here / script.group(1)).exists(), task)
+
+    def test_failed_read_is_reported_not_no_data(self):
+        with mock.patch.dict(nightshift._sched_cache, {"at": 0.0, "data": [], "busy": False, "error": False}), \
+                mock.patch("nightshift.schedules", side_effect=OSError("powershell missing")), \
+                mock.patch("nightshift.threading.Thread", lambda target, daemon: mock.Mock(start=target)):
+            self.assertEqual(nightshift.schedules_view(), {"rows": [], "error": True})
 
     def test_failed_schedule_lights_the_mart(self):
         runner = actions.Runner({}, pathlib.Path(tempfile.gettempdir()) / "ns-none")
@@ -119,6 +144,11 @@ class Schedules(unittest.TestCase):
             (d / "fleet-pull.log").write_text("ssh: timeout")
             self.assertEqual(nightshift.log_tail("fleet-pull", 3, d), "ssh: timeout")  # a check action's log
             self.assertIsNone(nightshift.log_tail("resume-mtg-web", 3, d))  # session actions stay off the list
+            (d / "dashboard.log").write_text("\n".join(f"line {i:05d}" for i in range(20000)))  # well past TAIL_BYTES
+            self.assertEqual(nightshift.log_tail("dashboard", 2, d), "line 19998\nline 19999")
+            every = nightshift.log_tail("dashboard", 100000, d).splitlines()
+            self.assertTrue(all(len(x) == 10 for x in every), every[0])  # the line the byte cut landed in is dropped
+            self.assertLess(len(every), 20000)  # only the end was read
 
 
     def test_dusty_lists_unused_and_old_skills_only(self):

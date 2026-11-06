@@ -137,6 +137,16 @@ class FakeVault(unittest.TestCase):
         write(self.root, "flag", "full\n")
         self.assertEqual(vault.ponytail_status(self.root / "flag"), {"present": True, "mode": "full"})
 
+    def test_inbox_bundle_folder_is_one_item(self):
+        # /triage's bundle layout: _inbox/<slug>/ with its note, shots/ and data/ moves as one
+        write(self.root, "_inbox/cable-study/z-cable-study.md", "---\ntitle: Cable study\ntags: [research]\n---\n")
+        write(self.root, "_inbox/cable-study/data/a-extra.md", "---\ntitle: x\n---\n")  # sorts first by name
+        (self.root / "_inbox" / "cable-study" / "shots").mkdir()
+        (self.root / "_inbox" / "only-shots").mkdir()  # no note yet: not listed, the same as the Night Shift drawer
+        rows = {r["name"]: r for r in vault.inbox_panel(self.root, TODAY)}
+        self.assertEqual(set(rows), {"cap", "cable-study"})
+        self.assertEqual(rows["cable-study"]["tags"], ["research"])  # the bundle's own note, not data/extra.md
+
     def test_summary_counts(self):
         write(self.root, "daily/2026-W37-review.md", "---\ntitle: W37\nstatus: seed\n---\n")
         s = vault.summary(self.root, TODAY)

@@ -12,6 +12,7 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 import threading
 import time
 
@@ -76,10 +77,12 @@ def live(runner: actions.Runner) -> dict:
 # --- local Scheduled Tasks (the 24H Mart) ---------------------------------------------------------------------
 # Task name -> log under ~/.second-brain/logs (None: no log of its own). The only names the log route will read.
 SCHEDULE_LOGS = {"SecondBrain-Dashboard": "dashboard", "SecondBrain-LedgerRefresh": "ledger-refresh",
-                 "SecondBrain-WeeklyReview": "weekly-review", "SecondBrain-Syncthing": None}
+                 "SecondBrain-WeeklyReview": "weekly-review", "SecondBrain-Syncthing": None,
+                 "SecondBrain-FleetPull": "fleet-pull"}
 SCHEDULE_TTL = 60
-# 0 success, 267009 running now, 267011 not run yet; anything else is a failed last run
-SCHEDULE_FINE = {0, 267009, 267011}
+# 0 success, 267009 running now, 267011 not run yet, 267014 stopped by the user; anything else is a failed last run.
+# A task that is running now is fine whatever its last result (the dashboard task after a restart shows 1 or 267014).
+SCHEDULE_FINE = {0, 267009, 267011, 267014}
 _PS = ("Get-ScheduledTask -TaskName 'SecondBrain-*' | ForEach-Object { $i = $_ | Get-ScheduledTaskInfo; "
        "[pscustomobject]@{ name = $_.TaskName; state = [string]$_.State; "
        "last = if ($i.LastRunTime.Year -gt 2000) { $i.LastRunTime.ToString('s') } else { $null }; "
@@ -94,12 +97,12 @@ def schedules() -> list[dict]:
     rows = json.loads(out) if out else []
     rows = [rows] if isinstance(rows, dict) else rows  # one task serialises as an object, not a list
     for r in rows:
-        r["ok"] = r["result"] in SCHEDULE_FINE
+        r["ok"] = r["state"] == "Running" or r["result"] in SCHEDULE_FINE
         r["log"] = SCHEDULE_LOGS.get(r["name"])
     return sorted(rows, key=lambda r: r["name"])
 
 
-_sched_cache: dict = {"at": 0.0, "data": [], "busy": False}
+_sched_cache: dict = {"at": 0.0, "data": [], "busy": False, "error": False}
 _sched_lock = threading.Lock()
 
 
@@ -114,15 +117,22 @@ def schedules_cached() -> list[dict]:
             try:
                 data = schedules()
                 with _sched_lock:
-                    _sched_cache.update(data=data, at=time.monotonic())
-            except Exception:  # noqa: BLE001 - keep the last data; the next poll retries after the TTL
+                    _sched_cache.update(data=data, at=time.monotonic(), error=False)
+            except Exception as e:  # noqa: BLE001 - keep the last data; the next poll retries after the TTL
+                print(f"schedules: could not read the Scheduled Tasks: {e!r}", file=sys.stderr)  # lands in dashboard.log
                 with _sched_lock:
-                    _sched_cache["at"] = time.monotonic()
+                    _sched_cache.update(at=time.monotonic(), error=True)
             finally:
                 with _sched_lock:
                     _sched_cache["busy"] = False
         threading.Thread(target=refresh, daemon=True).start()
     return _sched_cache["data"]
+
+
+def schedules_view() -> dict:
+    """What the mart drawer shows: the rows, and whether the last read failed (so it never just says "No data yet")."""
+    rows = schedules_cached()
+    return {"rows": rows, "error": _sched_cache["error"]}
 
 
 FLEET_FILE = actions.HOME / "state" / "fleet.json"
@@ -144,6 +154,7 @@ def fleet(path: pathlib.Path = FLEET_FILE, config: pathlib.Path = FLEET_CONFIG) 
 
 # check actions' own logs too, for the dashboard's "Read log" on a failed check; session logs only say a window opened
 CHECK_LOGS = frozenset(k for k, a in actions.default_actions().items() if a["kind"] == "check")
+TAIL_BYTES = 64 * 1024  # far more than 40 lines of any log here
 
 
 def log_tail(name: str, lines: int = 40, logs_dir: pathlib.Path = actions.HOME / "logs") -> str | None:
@@ -151,10 +162,16 @@ def log_tail(name: str, lines: int = 40, logs_dir: pathlib.Path = actions.HOME /
     if name is None or (name not in SCHEDULE_LOGS.values() and name not in CHECK_LOGS):
         return None
     try:
-        return "".join((logs_dir / f"{name}.log").read_text(encoding="utf-8", errors="replace")
-                       .splitlines(keepends=True)[-lines:])
+        with open(logs_dir / f"{name}.log", "rb") as f:  # read only the end: the dashboard log grows for months
+            size = f.seek(0, 2)
+            f.seek(max(0, size - TAIL_BYTES))
+            text = f.read().decode("utf-8", errors="replace").replace("\r\n", "\n")  # as read_text gave before
     except OSError:
         return ""
+    kept = text.splitlines(keepends=True)
+    if size > TAIL_BYTES:
+        kept = kept[1:]  # the first line was cut part way
+    return "".join(kept[-lines:])
 
 
 DUSTY_DAYS = 30

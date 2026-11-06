@@ -22,6 +22,7 @@ document.head.createEl("style", { attr: { id: "ns-style" } }).textContent = `
 .ns { --night:#0e0a18; --panel:#1d1830; --raised:#262043; --edge:#2b2946; --edge-strong:#67648f; --ink:#c9d2bf; --dim:#7f9cab;
   --cyan:#5ff4ff; --pink:#ff4fb4; --amber:#ffb85c; --green:#6dff8a; --num: "Silkscreen", "Pixelify Sans", monospace;
   container: ns / inline-size; color: var(--ink); background: var(--night);
+  --no-tooltip: true; /* Obsidian's own aria-label tooltip; the note draws its own (.ns-tip), so two would overlap */
   font: 15px/1.45 "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif; }
 .ns-stage { position: relative; }
 .ns-scene { position: relative; }
@@ -40,6 +41,7 @@ document.head.createEl("style", { attr: { id: "ns-style" } }).textContent = `
 .ns-drawer, .ns-toast { z-index: 20; }
 .ns-scene video.ns-rain, .ns-scene video.ns-loop { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; margin: 0; }
 .ns-scene video.ns-rain { image-rendering: pixelated; mix-blend-mode: screen; }
+.ns-scene img.ns-state { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .ns-scene video.ns-rain[hidden], .ns-scene video.ns-loop[hidden] { display: none; }
 .ns button.ns-rain-toggle { position: absolute; left: 8px; bottom: 8px; z-index: 20; padding: 3px 10px; font-size: 13px;
   background: #0e0a18cc; color: var(--ink); border: 1px solid var(--edge-strong); }
@@ -54,7 +56,9 @@ document.head.createEl("style", { attr: { id: "ns-style" } }).textContent = `
 .ns button.ns-spot::before { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 24px); height: max(100%, 24px); transform: translate(-50%, -50%); }
 .ns.show-all .ns-tag { opacity: 1; }
 .ns.show-all button.ns-spot { border-color: #5ff4ff88; }
-.ns.show-all .ns-tag[data-key]::before { content: attr(data-key) " "; color: var(--night); opacity: .7; }
+/* the key number as its own dark chip in the number face, so it reads at a glance and is not mistaken for the name */
+.ns.show-all .ns-tag[data-key]::before { content: attr(data-key); display: inline-block; margin: 0 5px 0 -5px; padding: 0 4px;
+  font: 12px/1.35 var(--num); color: var(--amber); background: var(--night); }
 .ns button.ns-spot:hover, .ns button.ns-spot[aria-expanded="true"] { outline: none; }
 .ns button.ns-spot:focus-visible { border-color: var(--cyan); outline: none; }
 .ns-tag { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
@@ -161,6 +165,7 @@ document.head.createEl("style", { attr: { id: "ns-style" } }).textContent = `
 .ns-notes { position: absolute; right: 2%; bottom: 8px; z-index: 25; display: grid; gap: 6px; justify-items: end; max-width: 60%; }
 .ns-note { display: flex; gap: 10px; align-items: center; padding: 6px 10px; font-size: 13.5px; background: #0e0a18f2; border: 1px solid var(--green); }
 .ns-note.fail { border-color: var(--pink); }
+.ns-note.fu { border-color: var(--amber); }
 .ns-note button { padding: 1px 7px; font-size: 12.5px; background: var(--night); color: var(--ink); border: 1px solid var(--edge-strong); }
 .ns-note pre { margin: 0; max-height: 140px; overflow: auto; font: 12px/1.3 ui-monospace, monospace; white-space: pre-wrap; }
 .ns-chip { padding: 2px 8px; font-size: 12.5px; background: #0e0a18e6; color: var(--pink); border: 1px solid var(--pink); }
@@ -207,7 +212,14 @@ const str = (v) => v == null ? "" : (v.toISODate ? v.toISODate() : String(v))
 // --- vault data (rules carried over from the Omnissiah Terminal) ---------------------------
 const projects = dv.pages('"projects"').where(p => p.file.folder === "projects" && p.file.tags.includes("#project"))
 const byStatus = (s) => projects.where(p => p.status === s).length
-const inbox = dv.pages('"_inbox"').sort(p => p.file.ctime, "asc")
+// a capture is a note in _inbox/ or a bundle _inbox/<slug>/ (note, shots/, data/; /triage moves it whole): one item per
+// bundle, its shallowest note (then by path) standing for it (same rule as _dashboard/vault.py inbox_panel)
+const inboxSeen = new Set()
+const inbox = dv.pages('"_inbox"').sort(p => p.file.path.split("/").length + ":" + p.file.path, "asc").filter(p => {
+  const key = p.file.folder === "_inbox" ? p.file.path : p.file.folder.split("/").slice(0, 2).join("/")
+  if (inboxSeen.has(key)) return false
+  inboxSeen.add(key); return true
+}).sort(p => p.file.ctime, "asc")
 
 // Same rule as _tooling.base "Drift" and "Stale".
 const tracked = dv.pages('"areas/tooling"').where(p => !["proposed", "rejected"].includes(p.adoption)
@@ -244,14 +256,15 @@ for (const d of dailies.array().slice(0, 5)) {
   if (sessions.length) { sessionDay = d; break }
 }
 
-// Job search: counts only, never company names. Follow-up rule mirrors
-// _dashboard/vault.py jobs_panel (/outcome Step 2b); change them together.
+// Job search: the panel shows counts only, never company names; the once-a-day follow-up note names only those that
+// became due in the last 7 days (his call, 2026-11-05). Follow-up rule mirrors _dashboard/vault.py jobs_panel
+// (/outcome Step 2b); change them together.
 let jobs = null
 try {
   const FINAL = ["hired", "rejected", "no_response", "offer_declined", "withdrawn"]
   const rows = (await dv.io.csv("projects/ai-job-search/job_search_tracker.csv")).array()
   const today = now.toISODate()
-  jobs = { sent: 0, open: 0, due: 0, interview: 0 }
+  jobs = { sent: 0, open: 0, due: 0, interview: 0, fresh: [] }
   for (const r of rows) {
     const status = str(r.status).trim().toLowerCase().replace(/ /g, "_")
     if (status === "drafted") continue
@@ -263,7 +276,10 @@ try {
     const dates = [str(r.date).slice(0, 10), ...(notes.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? [])].filter(d => d && d <= today).sort()
     const followups = (notes.match(/followed up \d{4}-\d{2}-\d{2}/gi) ?? []).length
     const last = dates.length && str(r.date) ? dates[dates.length - 1] : null
-    if (last && ageDays(dv.date(last)) >= 10 && followups < 2) jobs.due++
+    if (last && ageDays(dv.date(last)) >= 10 && followups < 2) {
+      jobs.due++
+      if (ageDays(dv.date(last)) <= 16) jobs.fresh.push(str(r.company).trim() || "(no company)") // due date in the last 7 days
+    }
   }
 } catch (e) { jobs = null }
 
@@ -348,14 +364,14 @@ const icon = (parent, id) => {
 let RENDERED = {}
 try { RENDERED = JSON.parse(await app.vault.adapter.read("_attachments/scenes/night-shift-3d-spots.json")) } catch { missing.push("_attachments/scenes/night-shift-3d-spots.json") }
 const SPOTS = [
-  { id: "projects", label: "Projects", box: [62.55, 37.87, 19.43, 30.37], warn: false, fill(d) {
+  { id: "projects", label: "Projects", box: [66.56, 46.85, 22.66, 33.24], warn: false, fill(d) {
     el(d, "div", "ns-sub", "In the hydroponics florist and its balcony, by growth stage")
     row(d, "Seed", byStatus("seed")); row(d, "Growing", byStatus("growing")); row(d, "Evergreen", byStatus("evergreen"))
     list(d, projects.sort(p => p.file.mtime, "desc").limit(6).array(), p => `${ageDays(p.file.mtime)}d ago`)
     el(d, "div", "ns-sub", "Resume opens a new Claude session in VS Code with the prompt ready: wait about 5 s and don't click another window, then press Enter")
     acts(d, ["mtg-web", "recipe-box", "agentic-fleet", "ai-job-search", "mtg-deck-builder"].map(r => [r, "resume-" + r, `Continue ${r} where it left off` + S]))
   } },
-  { id: "tooling", label: "Tooling", box: [25.3, 54.3, 8.7, 18.2], warn: drift.length > 0, fill(d) {
+  { id: "tooling", label: "Tooling", box: [21.67, 59.35, 10.78, 23.15], warn: drift.length > 0, fill(d) {
     el(d, "div", "ns-sub", "At the repair shop: tools in the ledger that need attention")
     row(d, "Update available", drift.length, drift.length > 0)
     row(d, "Unchecked 30+ days", stale.length, stale.length > 0)
@@ -363,7 +379,7 @@ const SPOTS = [
     list(d, drift.limit(6).array())
     acts(d, [["Refresh the ledger", "ledger-refresh"]])
   } },
-  { id: "daily", label: "Daily log", box: [41, 72.7, 10.1, 23.1], warn: kept < 4, fill(d) {
+  { id: "daily", label: "Daily log", box: [31.88, 68.43, 20.26, 20.83], warn: kept < 4, fill(d) {
     el(d, "div", "ns-sub", sessionDay ? `Sessions logged on ${sessionDay.file.name}` : "No sessions logged in the last five daily notes")
     sec(d, "This week")
     row(d, "Days logged, last 7", `${kept}/7`, kept < 4)
@@ -385,7 +401,7 @@ const SPOTS = [
       if (review) link(ln, review, review.file.name.replace(/^\d{4}-W(\d+)-review$/, "Weekly review W$1"))
     }
   } },
-  { id: "inbox", label: "Inbox", box: [46.4, 59.9, 3.4, 12.4], warn: inbox.length > 10, fill(d) {
+  { id: "inbox", label: "Inbox", box: [1.25, 55.09, 5.99, 16.48], warn: inbox.length > 10, fill(d) {
     el(d, "div", "ns-sub", "Messages on the side-wall screen: notes in _inbox to triage")
     row(d, "Waiting", inbox.length, inbox.length > 10)
     if (inbox.length) row(d, "Oldest (days)", ageDays(inbox.first().file.ctime), ageDays(inbox.first().file.ctime) > 14)
@@ -393,20 +409,20 @@ const SPOTS = [
     if (!inbox.length) el(d, "div", "ns-sub", "Inbox is empty.")
     acts(d, [["Triage the inbox", "triage"]])
   } },
-  { id: "jobs", label: "Job search", box: [33.4, 61, 17.2, 22.9], warn: (jobs?.due ?? 0) > 0, fill(d) {
+  { id: "jobs", label: "Job search", box: [31.88, 33.61, 20.26, 42.22], warn: (jobs?.due ?? 0) > 0, fill(d) {
     el(d, "div", "ns-sub", "At the net café on the corner: counts from the job tracker, no company names")
     if (!jobs) return el(d, "div", "ns-sub", "Can't read projects/ai-job-search/job_search_tracker.csv.")
     row(d, "Applications sent", jobs.sent); row(d, "Waiting on a reply", jobs.open)
     row(d, "Interviews", jobs.interview); row(d, "Follow-ups due", jobs.due, jobs.due > 0)
     acts(d, [["Run /scrape", "scrape"]])
   } },
-  { id: "orphans", label: "Orphan notes", box: [86.2, 38.8, 3.7, 9.5], warn: orphans.length > 20, fill(d) {
+  { id: "orphans", label: "Orphan notes", box: [81.67, 76.48, 2.4, 3.61], warn: orphans.length > 20, fill(d) {
     el(d, "div", "ns-sub", "Notes with a status that nothing links to")
     row(d, "Orphans", orphans.length, orphans.length > 20)
     list(d, orphans.sort(p => p.file.mtime, "desc").limit(6).array())
     acts(d, [["Sort orphans", "sort-orphans"]])
   } },
-  { id: "games", label: "Game hub", box: [51.04, 56.76, 12.29, 20.56], warn: false, fill(d) {
+  { id: "games", label: "Game hub", box: [51.67, 52.22, 15.42, 34.35], warn: false, fill(d) {
     el(d, "div", "ns-sub", "In the game hub on the ground floor: your card games and deck work")
     const homes = ["areas/cyberpunk-tcg", "projects/mtg-deck-builder", "projects/mtg-web"].map(p => dv.page(p)).filter(Boolean)
     list(d, homes, p => `${ageDays(p.file.mtime)}d ago`)
@@ -415,13 +431,13 @@ const SPOTS = [
   } },
   // the satellite dish: the Oracle box as of the last manual pull (fleet_pull.py, no schedule; pinned in pins.md)
   { id: "fleet", label: "Fleet uplink", box: null, warn: false, fill(d) {
-    el(d, "div", "ns-sub", "On the satellite dish: the Oracle box, as of the last pull (a button pulls it, nothing runs on a timer)")
+    el(d, "div", "ns-sub", "On the satellite dish: the Oracle box, as of the last pull (every 10 minutes while you're logged on; the button pulls now)")
     const body = el(d, "div")
     const ago = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago` }
     const draw = async () => {
       body.empty()
       let f
-      try { f = (await requestUrl({ url: API + "/api/night-shift/fleet", headers: HDR })).json } catch { return body.setText("Dashboard server is not reachable on 127.0.0.1:8790.") }
+      try { f = (await requestUrl({ url: API + "/api/night-shift/fleet", headers: hdr() })).json } catch { return body.setText("Dashboard server is not reachable on 127.0.0.1:8790.") }
       if (!f.present) el(body, "div", "ns-sub", "No pull yet. Use the button below.")
       else {
         const status = el(body, "div", "ns-row" + (f.ok ? "" : " warn"))
@@ -486,7 +502,7 @@ const SPOTS = [
     sec(d, "Dusty shelf")
     const shelf = el(d, "div")
     shelf.setText("Counting skill use…")
-    requestUrl({ url: API + "/api/night-shift/dusty", headers: HDR }).then(({ json }) => {
+    requestUrl({ url: API + "/api/night-shift/dusty", headers: hdr() }).then(({ json }) => {
       shelf.empty()
       if (!json.skills) return el(shelf, "div", "ns-sub", "Still counting skill use. Reopen this panel in a few seconds.")
       if (!json.skills.length) return el(shelf, "div", "ns-sub", `Every skill here was used in the last ${json.days} days.`)
@@ -507,9 +523,10 @@ const SPOTS = [
     el(d, "div", "ns-sub", "In the 24H Mart: this PC's scheduled tasks, read from Windows Task Scheduler")
     const body = el(d, "div"), logBox = el(d, "pre", "ns-log"); logBox.hidden = true
     const when = (s) => s ? s.replace("T", " ").slice(0, 16) : "none"
-    const show = async (url, fn) => { try { fn((await requestUrl({ url: API + url, headers: HDR })).json) } catch { body.setText("Dashboard server is not reachable on 127.0.0.1:8790.") } }
-    show("/api/night-shift/schedules", (rows) => {
-      if (!rows.length) return body.setText("No data yet: reopen this in a few seconds.")
+    const show = async (url, fn) => { try { fn((await requestUrl({ url: API + url, headers: hdr() })).json) } catch { body.setText("Dashboard server is not reachable on 127.0.0.1:8790.") } }
+    show("/api/night-shift/schedules", ({ rows, error }) => {
+      if (!rows.length) return body.setText(error ? "Could not read this PC's Scheduled Tasks (PowerShell failed). The reason is in ~/.second-brain/logs/dashboard.log." : "No data yet: reopen this in a few seconds.")
+      if (error) el(body, "div", "ns-sub", "The last read failed, so this list may be out of date.")
       for (const r of rows) {
         row(body, r.name.replace("SecondBrain-", ""), r.ok ? r.state : `failed (${r.result})`, !r.ok)
         el(body, "div", "ns-sub", `last ${when(r.last)}, next ${when(r.next)}`)
@@ -571,7 +588,7 @@ const SPOTS = [
     }
     if (pinsNote) link(el(d, "div", "ns-links"), pinsNote, "Open pins.md")
   } },
-  { id: "news", label: "Notifications", box: [38, 23.8, 8, 32.9], warn: news.length > 0, fill(d) {
+  { id: "news", label: "Notifications", box: [34.69, 0, 9.38, 38.61], warn: news.length > 0, fill(d) {
     el(d, "div", "ns-sub", "On the big rooftop screen: changes seen since this dashboard last rendered")
     if (!log.length) return el(d, "div", "ns-sub", "Nothing has changed yet. Changes show up here as the vault moves.")
     const ul = el(d, "ul", "ns-list")
@@ -595,6 +612,16 @@ scene.createEl("img", { attr: { src: sceneSrc, draggable: "false",
 // pause out of view. On/off is remembered; the first visit follows the OS
 // reduced-motion setting, and the still shows whenever motion is off. Hover masks come from the still.
 const loop = scene.createEl("video", { cls: "ns-loop", attr: { src: await srcFresh("_attachments/scenes/night-shift-3d-loop.webm"), poster: sceneSrc, "aria-hidden": "true" } })
+// state layers (job 7): extra props the scene session renders alone with the corner as holdout, one full-frame RGBA
+// still per level, over the loop and under the rain (so rain still falls in front). Level n shows once the value passes
+// its nth cut-off; a level not rendered yet shows nothing. Decorative only: the panels carry the same counts in words.
+const STATE_LAYERS = [{ id: "orphans", value: orphans.length, levels: [10, 20, 40] }]
+for (const s of STATE_LAYERS) {
+  const level = s.levels.filter(t => s.value > t).length
+  const file = level && app.vault.getAbstractFileByPath(`_attachments/scenes/night-shift-3d-state-${s.id}-${level}.png`)
+  if (file) scene.createEl("img", { cls: "ns-state", attr: { src: app.vault.getResourcePath(file), alt: "", "aria-hidden": "true",
+    draggable: "false", "data-state": `${s.id}-${level}` } })
+}
 const rain = scene.createEl("video", { cls: "ns-rain", attr: { src: await srcFresh("_attachments/scenes/night-shift-3d-rain.mp4"), "aria-hidden": "true" } })
 for (const v of [loop, rain]) { v.muted = true; v.loop = true; v.playsInline = true }
 let rainOn = load("night-shift:rain", !matchMedia("(prefers-reduced-motion: reduce)").matches), inView = false
@@ -748,7 +775,10 @@ syncView = () => {
 // --- live state: poll the dashboard server (_dashboard/actions.py, nightshift.py) while the scene is on screen ----
 // Live state is polled and never written into the vault (Dataview re-runs on vault changes; Syncthing would churn).
 const { requestUrl } = require("obsidian")
-const API = "http://127.0.0.1:8790", HDR = { "X-Night-Shift": "1" }
+const API = "http://127.0.0.1:8790"
+// the server writes a new token here at each start (nightshift_api.TOKEN_FILE); read per request so a restart needs no reload
+const TOKEN_FILE = require("path").join(require("os").homedir(), ".second-brain", "night-shift-token")
+function hdr() { let t = ""; try { t = require("fs").readFileSync(TOKEN_FILE, "utf8").trim() } catch {}; return { "X-Night-Shift": t } }
 const applyStates = (objs) => {
   for (const [id, g] of Object.entries(glows)) {
     const o = objs[id]
@@ -777,11 +807,11 @@ function setOffline(off) {
 const poll = async () => {
   if ((!inView && !root.hasClass("list-mode")) || !root.isConnected) return // the hidden scene is never "in view" in list mode
   try {
-    applyStates((await requestUrl({ url: API + "/api/night-shift", headers: HDR })).json.objects)
+    applyStates((await requestUrl({ url: API + "/api/night-shift", headers: hdr() })).json.objects)
     lastAnswer = Date.now(); setOffline(false)
   } catch { setOffline(true) } // server down: keep the last glow
 }
-const actionState = async (id) => { try { return (await requestUrl({ url: `${API}/actions/${id}`, headers: HDR })).json } catch { return null } }
+const actionState = async (id) => { try { return (await requestUrl({ url: `${API}/actions/${id}`, headers: hdr() })).json } catch { return null } }
 // waits for a started action to stop running (2 s steps, up to 4 min; a few failed reads are a blip, not a result).
 // Returns its last state, or null when it is unknown (the server stopped answering, or it is still running).
 async function finished(id) {
@@ -802,7 +832,7 @@ function note(text, fail, logId) {
     const rb = el(n, "button", null, "Read log"); rb.type = "button"; tip(rb, TIPS.readlog)
     rb.onclick = async () => {
       let t = "(no log)"
-      try { t = (await requestUrl({ url: `${API}/api/night-shift/log/${logId}`, headers: HDR })).json.text || "(empty)" } catch {}
+      try { t = (await requestUrl({ url: `${API}/api/night-shift/log/${logId}`, headers: hdr() })).json.text || "(empty)" } catch {}
       const pre = createEl("pre", { text: t.split("\n").slice(-12).join("\n") }); pre.tabIndex = -1
       rb.replaceWith(pre); pre.focus() // keyboard focus moves to the log, not lost with the button
     }
@@ -810,6 +840,20 @@ function note(text, fail, logId) {
   const x = el(n, "button", null, "×"); x.type = "button"; x.setAttr("aria-label", "Dismiss"); tip(x, "Dismiss this note.")
   x.onclick = () => n.remove()
   if (!fail) setTimeout(() => n.remove(), 8000) // a failure stays until dismissed
+}
+// once a day: the follow-ups that became due this week, by name (his call, 2026-11-05). Dismissing it or pressing
+// Show marks the day done; until then a re-render (any vault change) brings it back, so it stays until he acts.
+const FU_KEY = "night-shift:followups-done"
+if (jobs?.fresh.length && load(FU_KEY, null) !== now.toISODate()) {
+  const n = el(notes, "div", "ns-note fu")
+  const rest = jobs.due - jobs.fresh.length
+  el(n, "span", null, `Follow-ups due this week: ${jobs.fresh.join(", ")}.` +
+    (rest ? ` ${rest} older ${rest === 1 ? "one is" : "ones are"} still open.` : ""))
+  const done = () => { save(FU_KEY, now.toISODate()); n.remove() }
+  const sb = el(n, "button", null, "Show"); sb.type = "button"; tip(sb, "Open the Job search panel.")
+  sb.onclick = () => { done(); open("jobs", true) }
+  const x = el(n, "button", null, "×"); x.type = "button"; x.setAttr("aria-label", "Hide until tomorrow"); tip(x, "Hide until tomorrow.")
+  x.onclick = done
 }
 // starts an action; with its button, the button shows Starting..., then the result for 4 s. Returns true once started.
 async function runAction(id, text, btn) {
@@ -819,7 +863,7 @@ async function runAction(id, text, btn) {
   let started = false
   try {
     const r = await requestUrl({ url: `${API}/actions/${id}`, method: "POST", throw: false,
-      headers: text === undefined ? HDR : { ...HDR, "content-type": "application/json" },
+      headers: text === undefined ? hdr() : { ...hdr(), "content-type": "application/json" },
       body: text === undefined ? undefined : JSON.stringify({ text }) })
     started = r.status === 202
     if (!started) new Notice(r.status === 409 ? "Already running." : r.status === 422 ? `That text is not accepted (${(text ?? "").trim().length} characters sent; it must be 1 to 150, and a clip link must start with http).` : `Could not start (${r.status}).`)
