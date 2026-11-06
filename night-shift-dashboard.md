@@ -498,6 +498,23 @@ const SPOTS = [
     inp.addEventListener("input", sync)
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); btns["lib-ask"].click() } })
     sync()
+    // Research: one row per study folder resources/research/<project>/<study>/ (its note, shots/, data/), newest note
+    // first; the image count is read live from the folder, never stored. Read-only: a row only opens its note.
+    const IMG = /\.(png|jpe?g|webp|gif)$/i, MAX_STUDIES = 8
+    const images = (f) => f.children ? f.children.reduce((n, c) => n + images(c), 0) : IMG.test(f.name) ? 1 : 0
+    const studies = (app.vault.getAbstractFileByPath("resources/research")?.children ?? [])
+      .flatMap(p => (p.children ?? []).filter(s => s.children).map(s => ({ project: p.name, s, note: s.children.find(c => c.extension === "md") })))
+      .sort((a, b) => (b.note?.stat.mtime ?? 0) - (a.note?.stat.mtime ?? 0))
+    if (studies.length) {
+      sec(d, `Research studies (${studies.length})`)
+      const ul = el(d, "ul", "ns-list")
+      for (const { project, s, note } of studies.slice(0, MAX_STUDIES)) {
+        const li = el(ul, "li"), title = note && app.metadataCache.getFileCache(note)?.frontmatter?.title
+        if (note) link(li, { file: note }, title || note.basename); else el(li, "span", null, s.name)
+        const n = images(s); el(li, "span", "age", `${project}, ${n} image${n === 1 ? "" : "s"}`)
+      }
+      if (studies.length > MAX_STUDIES) el(d, "div", "ns-sub", `${studies.length - MAX_STUDIES} more in resources/research/`)
+    }
     // Dusty shelf: skills loadable here and unused for 30+ days (from the transcripts, refreshed every 10 min by the server)
     sec(d, "Dusty shelf")
     const shelf = el(d, "div")

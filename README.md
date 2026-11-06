@@ -25,8 +25,8 @@ lights up on its own outline rather than as a box. The panels map to parts of my
 - the satellite dish shows the status of a small fleet of Discord agents I run on a cloud server, pulled every 10
   minutes while I am logged on
 - a trash bag on a rooftop counts notes that nothing links to, and more bags pile up on the roof as that count grows
-- the library takes a typed topic and starts a research session, and its "dusty shelf" lists skills I have not used
-  in 30 days
+- the library takes a typed topic and starts a research session, lists my finished research studies with how many
+  screenshots each holds, and its "dusty shelf" lists skills I have not used in 30 days
 - a flyer wall holds things I asked a session to pin, each with resume, stress-test and scope actions
 
 While something runs, its object pulses cyan. A failure turns it pink, and a finished check flashes green.
@@ -95,8 +95,8 @@ straight copy of the live code.
 
 ```
 night-shift-dashboard.md        the dashboard: one Dataview JS block (scene, panels, polling, keyboard, list view)
-_attachments/scenes/            the rendered scene, one hover mask per object, the rain loop, the hotspot boxes and
-                                the three trash-pile layers
+_attachments/scenes/            the rendered scene and its motion loop, one hover mask per object, the rain loop, the
+                                hotspot boxes and the three trash-pile layers
 _dashboard/
   night_shift_server.py         the server on its own (loopback only)
   nightshift_api.py             the routes and their guard
@@ -130,8 +130,7 @@ Google Fonts.
 
 Some parts are Windows-only: session buttons open VS Code through `code.cmd` and the Windows URL handler, and the
 24H Mart reads Windows Task Scheduler. Comments in the code sometimes point to planning notes in my private vault;
-those notes are not part of this repo. The scene's motion loop is not in this snapshot yet, so the still image shows
-instead.
+those notes are not part of this repo.
 
 ## How this was built
 
